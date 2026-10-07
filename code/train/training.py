@@ -11,6 +11,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 
 from config import (
+    config as base_config,
     ensure_training_parameters_confirmed,
     get_experiment_config,
 )
@@ -29,7 +30,7 @@ from train.data_handler import (
 from train.losses import SupConLoss, focal_loss
 
 
-repetition_seed_values = [40, 41, 42, 43, 44]
+repetition_seed_values = tuple(base_config["training"]["repetition_seeds"])
 repetition_output_mode = "nested_spatial_five_fold"
 
 
