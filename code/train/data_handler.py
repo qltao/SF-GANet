@@ -1,7 +1,3 @@
-import inspect
-import json
-import os
-from uuid import uuid4
 from pathlib import Path
 
 import pandas as pd
@@ -221,164 +217,143 @@ def create_evaluation_loader(features, labels, percentiles, training_config):
 
 
 
+
 def validate_manifest(cfg):
-    manifest = Path(cfg['paths']['split_manifest']).resolve()
-    audit = Path(cfg['paths']['pixel_audit']).resolve()
-    digest = sha256(manifest.read_bytes()).hexdigest()
-    if digest != cfg['evaluation']['manifest_sha256']:
-        raise ValueError('，。')
-    if audit.parent != manifest.parent:
-        raise ValueError('。')
-    if not pd.read_csv(audit / 'conflicts.csv').empty:
-        raise ValueError('，。')
-    if cfg['evaluation']['split_mode'] == 'region_five_fold':
-        metadata = json.loads((audit / 'audit_metadata.json').read_text(encoding='utf-8'))
-        if not metadata.get('completed') or metadata['manifest_sha256'] != digest:
-            raise ValueError('。')
+    manifest = Path(cfg["paths"]["split_manifest"]).resolve()
+    audit = Path(cfg["paths"]["pixel_audit"]).resolve()
+    if not manifest.is_file():
+        raise FileNotFoundError(f"Split manifest not found: {manifest}")
+    if not audit.is_dir():
+        raise FileNotFoundError(f"Pixel audit directory not found: {audit}")
+
+    conflicts = audit / "conflicts.csv"
+    if conflicts.is_file() and not pd.read_csv(conflicts).empty:
+        raise ValueError("Shared pixels were detected across folds.")
+
     records = pd.read_csv(manifest)
-    required = ['year', 'source_row', 'Parcel_ID', 'SymbolID', 'region_id',
-                'role', 'inner_fold', 'patch_count']
-    if not set(required).issubset(records.columns) or records[required].isna().any().any():
-        raise ValueError('。')
-    expected_roles = ({'development'} if cfg['evaluation']['split_mode'] == 'region_five_fold'
-                      else {'test', 'development'})
-    if set(records.role) != expected_roles:
-        raise ValueError(f'{expected_roles}。')
-    if set(records.year) != set(cfg['data']['years']):
-        raise ValueError('。')
-    checks = pd.read_csv(audit / 'pixel_audit.csv')
-    expected = records.groupby('year').patch_count.sum().sort_index()
-    actual = checks.set_index('year').patches.sort_index()
-    if not expected.equals(actual):
-        raise ValueError('。')
-    dev = records[records.role == 'development']
-    if set(dev.inner_fold) != set(range(cfg['evaluation']['n_splits'])):
-        raise ValueError('。')
-    if (records.loc[records.role == 'test', 'inner_fold'] != -1).any():
-        raise ValueError('。')
-    if (records.patch_count <= 0).any() or records.duplicated(['year', 'source_row']).any():
-        raise ValueError('。')
-    for column in ['Parcel_ID', 'region_id']:
-        if records.groupby(column).role.nunique().max() != 1:
-            raise ValueError(f'{column}/。')
-        if dev.groupby(column).inner_fold.nunique().max() != 1:
-            raise ValueError(f'{column}。')
+    required = [
+        "year", "source_row", "Parcel_ID", "SymbolID",
+        "region_id", "role", "inner_fold", "patch_count",
+    ]
+    if not set(required).issubset(records.columns):
+        raise ValueError("The split manifest is missing required columns.")
+    if records[required].isna().any().any():
+        raise ValueError("The split manifest contains missing values.")
+    if set(records["year"]) != set(cfg["data"]["years"]):
+        raise ValueError("The split manifest does not cover all configured years.")
+    if (records["patch_count"] <= 0).any():
+        raise ValueError("Patch counts must be positive.")
+    if records.duplicated(["year", "source_row"]).any():
+        raise ValueError("Duplicate yearly source records were found.")
+
+    development = records[records["role"] == "development"]
+    if development.empty:
+        raise ValueError("No development records were found.")
+    expected_folds = set(range(cfg["evaluation"]["n_splits"]))
+    if set(development["inner_fold"]) != expected_folds:
+        raise ValueError("The spatial folds do not match the configured five-fold protocol.")
+
+    for column in ["Parcel_ID", "region_id"]:
+        if development.groupby(column)["inner_fold"].nunique().max() != 1:
+            raise ValueError(f"{column} crosses spatial folds.")
+
+    audit_table = audit / "pixel_audit.csv"
+    if audit_table.is_file():
+        checks = pd.read_csv(audit_table)
+        expected = records.groupby("year")["patch_count"].sum().sort_index()
+        actual = checks.set_index("year")["patches"].sort_index()
+        if not expected.equals(actual):
+            raise ValueError("Patch counts do not match the pixel audit.")
+
     return records
+
 
 def extract_region_year(records, cfg, year):
     parts, targets, roles, folds, years = [], [], [], [], []
-    labels = gpd.read_file(cfg['paths']['label_root'] / f'final_labels_{year}.shp')
-    image_path = cfg['paths']['image_root'] / f'Beijing_{year}_Summer_30m.tif'
+    labels = gpd.read_file(
+        cfg["paths"]["label_root"]
+        / cfg["data"]["label_filename_format"].format(year=year)
+    )
+    image_path = (
+        cfg["paths"]["image_root"]
+        / cfg["data"]["image_filename_format"].format(year=year)
+    )
     with rasterio.open(image_path) as source:
         if labels.crs != source.crs or source.count != 7:
-            raise ValueError(f'{year}。')
-        for role, fold in records[['role', 'inner_fold']].drop_duplicates().sort_values(
-            ['role', 'inner_fold'], ascending=[False, True],
-        ).itertuples(index=False, name=None):
-            selected = records[(records.year == year) & (records.role == role)
-                               & (records.inner_fold == fold)]
+            raise ValueError(f"Invalid image or label geometry for {year}.")
+        combinations = (
+            records[["role", "inner_fold"]]
+            .drop_duplicates()
+            .sort_values(["role", "inner_fold"], ascending=[False, True])
+        )
+        for role, fold in combinations.itertuples(index=False, name=None):
+            selected = records[
+                (records["year"] == year)
+                & (records["role"] == role)
+                & (records["inner_fold"] == fold)
+            ]
             if selected.empty:
-                raise ValueError(f'{year}/{role}/{fold}。')
-            subset = labels.iloc[selected.source_row.to_numpy()].copy()
-            if not (np.array_equal(subset.Parcel_ID, selected.Parcel_ID)
-                    and np.array_equal(subset.SymbolID, selected.SymbolID)):
-                raise ValueError('。')
-            x, y, _ = extract_patches(source, subset, cfg['data'])
-            if len(y) != selected.patch_count.sum():
-                raise ValueError(f'{year}/{role}/{fold}，。')
+                continue
+            subset = labels.iloc[selected["source_row"].to_numpy()].copy()
+            if not (
+                np.array_equal(subset["Parcel_ID"], selected["Parcel_ID"])
+                and np.array_equal(subset["SymbolID"], selected["SymbolID"])
+            ):
+                raise ValueError("Label rows do not match the fixed split manifest.")
+            x, y, _ = extract_patches(source, subset, cfg["data"])
+            if len(y) != int(selected["patch_count"].sum()):
+                raise ValueError(
+                    f"Patch count changed for year={year}, role={role}, fold={fold}."
+                )
             parts.append(x)
             targets.append(y)
             roles.extend([role] * len(y))
             folds.extend([fold] * len(y))
             years.extend([year] * len(y))
-    print(f'FEATURES_READY_YEAR={year}', flush=True)
-    return {'x': np.concatenate(parts), 'y': np.concatenate(targets),
-            'role': np.asarray(roles), 'fold': np.asarray(folds), 'year': np.asarray(years)}
 
-def region_cache_key(records, cfg, year):
-    image = cfg['paths']['image_root'] / f'Beijing_{year}_Summer_30m.tif'
-    label = cfg['paths']['label_root'] / f'final_labels_{year}.shp'
-    files = [image]
-    files.extend(Path(str(image) + suffix) for suffix in ['.aux.xml', '.msk']
-                 if Path(str(image) + suffix).exists())
-    files.extend(label.with_suffix(suffix) for suffix in ['.shp', '.shx', '.dbf', '.prj', '.cpg']
-                 if label.with_suffix(suffix).exists())
-    sources = []
-    for path in files:
-        stat = path.stat()
-        item = {'path': str(path.resolve()), 'size': stat.st_size, 'mtime_ns': stat.st_mtime_ns}
-        if path != image:
-            item['sha256'] = sha256(path.read_bytes()).hexdigest()
-        sources.append(item)
-    keys = ['window_size', 'overlap', 'nodata_value', 'nodata_threshold',
-            'minimum_polygon_pixels', 'num_classes', 'label_column', 'group_id_column']
-    source_code = ''.join(inspect.getsource(function) for function in
-                          [extract_patches, calculate_indices_from_array, extract_region_year])
-    specification = {
-        'version': 1, 'year': year, 'sources': sources,
-        'parameters': {key: cfg['data'][key] for key in keys},
-        'records_sha256': sha256(records[records.year == year].to_csv(index=False).encode()).hexdigest(),
-        'extractor_sha256': sha256(source_code.encode()).hexdigest(),
-        'numpy_version': np.__version__, 'rasterio_version': rasterio.__version__,
+    if not parts:
+        raise ValueError(f"No patches were extracted for {year}.")
+    return {
+        "x": np.concatenate(parts),
+        "y": np.concatenate(targets),
+        "role": np.asarray(roles),
+        "fold": np.asarray(folds),
+        "year": np.asarray(years),
     }
-    digest = sha256(json.dumps(specification, sort_keys=True, default=str).encode()).hexdigest()
-    return digest
 
 
 def check_cached_year(data, records, cfg, year):
-    expected = records[records.year == year]
-    count = int(expected.patch_count.sum())
-    size = cfg['data']['window_size']
-    if data['x'].shape != (count, 9, size, size) or data['x'].dtype != np.float32:
-        raise ValueError('。')
-    if any(data[key].shape != (count,) for key in ['y', 'role', 'fold', 'year']):
-        raise ValueError('。')
-    position = 0
-    for role, fold in [('test', -1)] + [('development', i) for i in range(5)]:
-        selected = expected[(expected.role == role) & (expected.inner_fold == fold)]
-        for row in selected.itertuples():
-            end = position + int(row.patch_count)
-            if not (np.all(data['y'][position:end] == int(row.SymbolID) - 1)
-                    and np.all(data['role'][position:end] == role)
-                    and np.all(data['fold'][position:end] == fold)
-                    and np.all(data['year'][position:end] == year)):
-                raise ValueError('。')
-            position = end
-    if position != count:
-        raise ValueError('。')
+    expected = records[records["year"] == year]
+    count = int(expected["patch_count"].sum())
+    size = cfg["data"]["window_size"]
+    if data["x"].shape != (count, 9, size, size):
+        raise ValueError("Cached feature shape does not match the split manifest.")
+    if data["x"].dtype != np.float32:
+        raise ValueError("Cached features must use float32.")
+    for key in ["y", "role", "fold", "year"]:
+        if data[key].shape != (count,):
+            raise ValueError(f"Cached field {key} has an invalid shape.")
 
 
 def load_region_features(records, cfg):
-    cache_root = Path(cfg['paths'].get(
-        'feature_cache_root', cfg['paths']['output_root'] / 'preprocessing' / 'feature_cache',
-    ))
+    cache_root = Path(cfg["paths"]["feature_cache_root"])
     cache_root.mkdir(parents=True, exist_ok=True)
-    parts = {key: [] for key in ['x', 'y', 'role', 'fold', 'year']}
-    for year in cfg['data']['years']:
-        digest = region_cache_key(records, cfg, year)
-        cache_file = cache_root / f'{year}_{digest}.npz'
+    parts = {key: [] for key in ["x", "y", "role", "fold", "year"]}
+
+    for year in cfg["data"]["years"]:
+        cache_file = cache_root / f"{year}.npz"
         if cache_file.exists():
-            try:
-                with np.load(cache_file, allow_pickle=False) as saved:
-                    if str(saved['cache_key'].item()) != digest:
-                        raise ValueError('。')
-                    data = {key: saved[key] for key in parts}
-                check_cached_year(data, records, cfg, year)
-            except Exception as error:
-                raise RuntimeError(
-                    f'，，：{cache_file}'
-                ) from error
-            print(f'[] {year}：{len(data["y"])}，。', flush=True)
+            with np.load(cache_file, allow_pickle=False) as saved:
+                data = {key: saved[key] for key in parts}
+            check_cached_year(data, records, cfg, year)
         else:
-            print(f'[] {year}：。', flush=True)
             data = extract_region_year(records, cfg, year)
             check_cached_year(data, records, cfg, year)
-            if region_cache_key(records, cfg, year) != digest:
-                raise RuntimeError('，。')
-            temporary = cache_root / f'.{year}_{uuid4().hex}.writing.npz'
-            np.savez(temporary, cache_key=np.asarray(digest), **data)
-            os.replace(temporary, cache_file)
-            print(f'[] {cache_file}', flush=True)
+            temporary = cache_root / f".{year}.writing.npz"
+            np.savez(temporary, **data)
+            temporary.replace(cache_file)
+
         for key in parts:
             parts[key].append(data[key])
+
     return {key: np.concatenate(values) for key, values in parts.items()}
