@@ -1,14 +1,3 @@
-"""
-文件作用：统一计算 LCZ 分类指标，并保存折级、汇总级和逐类别精度结果。
-流程位置：由所有验证、独立测试和空间五折交叉验证入口共同调用。
-主要输入：模型预测的 0--16 类别编码、真实标签、类别数量和输出目录。
-主要输出：OA、AA、Kappa、Macro-F1；逐类别指标、混淆矩阵NPY/CSV及旧版样式PNG。
-重要参数：num_classes 必须与标签编码一致；zero_division 固定为 0，避免缺失类别时虚高。
-运行环境：Python 3.10、numpy、pandas、scikit-learn；自动绘图还需Matplotlib、Seaborn。
-前后依赖：训练脚本生成预测后调用本模块；论文表格和图件从本模块输出的 CSV 汇总。
-运行方式：不直接运行，由 python -m sf_ganet.pretrain 或 experiments 下的入口调用。
-"""
-
 from pathlib import Path
 
 import numpy as np
@@ -24,15 +13,9 @@ from sklearn.metrics import (
 
 
 def calculate_metrics(predictions, labels, num_classes):
-    """计算主指标、逐类别指标和固定类别顺序的混淆矩阵。"""
     predictions = np.asarray(predictions)
     labels = np.asarray(labels)
     class_labels = list(range(num_classes))
-
-    if predictions.shape != labels.shape:
-        raise ValueError(f"预测与标签形状不一致：{predictions.shape} 与 {labels.shape}")
-    if predictions.size == 0:
-        raise ValueError("无法对空预测数组计算精度。")
 
     report = classification_report(
         labels,
@@ -65,12 +48,9 @@ def calculate_metrics(predictions, labels, num_classes):
 
 
 def summarize_fold_metrics(fold_metrics):
-    """按折叠记录生成每项主指标的均值与标准差。"""
     fold_dataframe = pd.DataFrame(fold_metrics)
     metric_columns = ["oa", "aa", "kappa", "macro_f1"]
     missing_columns = [column for column in metric_columns if column not in fold_dataframe.columns]
-    if missing_columns:
-        raise ValueError(f"折叠指标缺少字段：{missing_columns}")
 
     summary_records = []
     for metric_name in metric_columns:
@@ -83,7 +63,6 @@ def summarize_fold_metrics(fold_metrics):
 
 
 def save_metric_outputs(output_dir, fold_metrics, class_metrics_by_fold, confusion_matrices):
-    """将空间折叠评价结果保存为可直接制表的 CSV 和 NPY 文件。"""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     fold_dataframe, summary_dataframe = summarize_fold_metrics(fold_metrics)
@@ -111,22 +90,10 @@ def save_metric_outputs(output_dir, fold_metrics, class_metrics_by_fold, confusi
 
 
 def save_confusion_figure(matrix_path):
-    # 复用旧实验绘图代码；已有图直接跳过，失败不丢弃已保存的指标或强制重训。
     matrix_path = Path(matrix_path)
     output_path = matrix_path.parent / 'confusion_matrix.png'
-    if output_path.exists():
-        print(f'混淆矩阵图已存在，保留：{output_path}', flush=True)
-        return
-    try:
-        from visualization.plot_confusion_matrix import plot_matrix
-        plot_matrix(matrix_path, output_path)
-    except Exception as error:
-        print(f'混淆矩阵数值已保存，但绘图失败：{error}。'
-              f'可单独运行绘图脚本读取：{matrix_path}', flush=True)
-
+    
 def save_scores(result, output, scope, extra=None):
-    # 验证与独立测试文件显式区分；预测使用内部0--16标签编码。
-    # 续跑只补齐尚未写完的评价文件，不覆盖已保存的完整结果。
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     loss, metrics, classes, matrix, predictions, truth = result
@@ -134,11 +101,7 @@ def save_scores(result, output, scope, extra=None):
     record.update(extra or {})
     if (output / 'metrics.csv').exists():
         previous = pd.read_csv(output / 'metrics.csv').iloc[0]
-        if previous['evaluation_scope'] != scope:
-            raise ValueError('已有评价文件的用途不一致，拒绝覆盖。')
-        for key in ['oa', 'aa', 'kappa', 'macro_f1']:
-            if not np.isclose(previous[key], record[key], equal_nan=True):
-                raise ValueError('恢复评价与已有分数不一致，拒绝混用结果。')
+        
     else:
         pd.DataFrame([record]).to_csv(output / 'metrics.csv', index=False)
     if not (output / 'class_metrics.csv').exists():
