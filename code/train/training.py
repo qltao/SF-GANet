@@ -205,7 +205,10 @@ def train_one_epoch(model, train_loader, optimizer, training_config, use_supcon)
     """完成一个训练 epoch，并返回平均总损失、分类损失和对比损失。"""
     model.train()
     # 沿用论文温度0.1及当前损失实现的默认基温0.1，不恢复旧脚本内部默认值。
-    contrastive_loss = SupConLoss(training_config['supcon_temperature'])
+    contrastive_loss = SupConLoss(
+        temperature=training_config['supcon_temperature'],
+        base_temperature=training_config['supcon_temperature'],
+    )
     loss_records = {"loss": 0.0, "classification_loss": 0.0, "contrastive_loss": 0.0}
     if len(train_loader) == 0:
         raise ValueError("训练 DataLoader 为空，无法开始训练。")
