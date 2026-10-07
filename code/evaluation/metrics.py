@@ -115,3 +115,4 @@ def save_scores(result, output, scope, extra=None):
     save_confusion_figure(output / 'confusion_matrix.npy')
     return record
 
+
