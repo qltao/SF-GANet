@@ -16,7 +16,7 @@ def focal_loss(outputs, targets, alpha=0.25, gamma=2.0):
 class SupConLoss(nn.Module):
     """Supervised Contrastive Learning Loss: https://arxiv.org/pdf/2004.11362.pdf."""
 
-    def __init__(self, temperature=0.07, base_temperature=0.07):
+    def __init__(self, temperature=0.1, base_temperature=0.1):
         super(SupConLoss, self).__init__()
         self.temperature = temperature
         self.base_temperature = base_temperature
