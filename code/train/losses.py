@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 def focal_loss(outputs, targets, alpha=0.25, gamma=2.0):
     """
     Focal Loss for multi-class classification.
