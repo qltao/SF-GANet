@@ -35,6 +35,12 @@ README.md
 - gdal==3.10.3
 - geopandas==1.1.1
 
+## Experimental protocol
 
-
+- Landsat imagery is handled at its native 30 m spatial resolution.
+- Patch extraction uses an 8 x 8-pixel sliding window with 50% overlap for all years from 2001 to 2020.
+- Spatial folds are assigned at the parcel level before patch extraction, so overlapping patches remain within the same fold.
+- Model-comparison, ablation, and training-strategy experiments are repeated with five random seeds (40-44).
+- The complete annual map series used for map-based temporal analysis is generated with the fixed default seed 42.
+- The supervised contrastive loss uses temperature = 0.1 and base_temperature = 0.1.
 
