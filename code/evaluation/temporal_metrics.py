@@ -146,3 +146,4 @@ if __name__ == '__main__':
         table.to_csv(output_csv, index=False, encoding='utf-8-sig')
         print(f'output{output_csv}')
 
+
