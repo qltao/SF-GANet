@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
@@ -25,94 +26,181 @@ def calculate_metrics(predictions, labels, num_classes):
         output_dict=True,
         zero_division=0,
     )
+
     class_records = []
     for class_id in class_labels:
-        class_report = report[str(class_id)]
-        class_records.append({
-            "class_id": class_id,
-            "precision": class_report["precision"],
-            "recall": class_report["recall"],
-            "f1": class_report["f1-score"],
-            "support": int(class_report["support"]),
-        })
+        current = report[str(class_id)]
+        class_records.append(
+            {
+                "class_id": class_id,
+                "precision": current["precision"],
+                "recall": current["recall"],
+                "f1": current["f1-score"],
+                "support": int(current["support"]),
+            }
+        )
 
     metrics = {
         "oa": accuracy_score(labels, predictions),
-        "aa": recall_score(labels, predictions, labels=class_labels, average="macro", zero_division=0),
-        "kappa": cohen_kappa_score(labels, predictions, labels=class_labels),
-        "macro_f1": f1_score(labels, predictions, labels=class_labels, average="macro", zero_division=0),
+        "aa": recall_score(
+            labels,
+            predictions,
+            labels=class_labels,
+            average="macro",
+            zero_division=0,
+        ),
+        "kappa": cohen_kappa_score(
+            labels,
+            predictions,
+            labels=class_labels,
+        ),
+        "macro_f1": f1_score(
+            labels,
+            predictions,
+            labels=class_labels,
+            average="macro",
+            zero_division=0,
+        ),
     }
-    class_metrics = pd.DataFrame(class_records)
-    matrix = confusion_matrix(labels, predictions, labels=class_labels)
-    return metrics, class_metrics, matrix
+
+    matrix = confusion_matrix(
+        labels,
+        predictions,
+        labels=class_labels,
+    )
+    return metrics, pd.DataFrame(class_records), matrix
 
 
 def summarize_fold_metrics(fold_metrics):
-    fold_dataframe = pd.DataFrame(fold_metrics)
+    table = pd.DataFrame(fold_metrics)
     metric_columns = ["oa", "aa", "kappa", "macro_f1"]
-    missing_columns = [column for column in metric_columns if column not in fold_dataframe.columns]
 
-    summary_records = []
-    for metric_name in metric_columns:
-        summary_records.append({
-            "metric": metric_name,
-            "mean": fold_dataframe[metric_name].mean(),
-            "std": fold_dataframe[metric_name].std(ddof=1),
-        })
-    return fold_dataframe, pd.DataFrame(summary_records)
+    missing = [
+        name
+        for name in metric_columns
+        if name not in table.columns
+    ]
+    if missing:
+        raise ValueError(
+            f"Missing metric columns: {missing}"
+        )
 
-
-def save_metric_outputs(output_dir, fold_metrics, class_metrics_by_fold, confusion_matrices):
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    fold_dataframe, summary_dataframe = summarize_fold_metrics(fold_metrics)
-    fold_dataframe.to_csv(output_dir / "fold_metrics.csv", index=False, encoding="utf-8-sig")
-    summary_dataframe.to_csv(output_dir / "metrics_summary.csv", index=False, encoding="utf-8-sig")
-
-    class_frames = []
-    for fold_index, class_metrics in enumerate(class_metrics_by_fold, start=1):
-        current_metrics = class_metrics.copy()
-        current_metrics.insert(0, "fold", fold_index)
-        class_frames.append(current_metrics)
-    if class_frames:
-        class_dataframe = pd.concat(class_frames, ignore_index=True)
-        class_dataframe.to_csv(output_dir / "class_metrics_by_fold.csv", index=False, encoding="utf-8-sig")
-        class_summary = class_dataframe.groupby(
-            "class_id",
-            as_index=False,
-        )[["precision", "recall", "f1", "support"]].agg(["mean", "std"])
-        class_summary.to_csv(output_dir / "class_metrics_summary.csv", encoding="utf-8-sig")
-
-    if confusion_matrices:
-        np.save(output_dir / "confusion_matrices.npy", np.asarray(confusion_matrices))
-        np.save(output_dir / "mean_confusion_matrix.npy", np.mean(confusion_matrices, axis=0))
-        save_confusion_figure(output_dir / 'mean_confusion_matrix.npy')
+    summary = pd.DataFrame(
+        [
+            {
+                "metric": name,
+                "mean": table[name].mean(),
+                "std": table[name].std(ddof=1),
+            }
+            for name in metric_columns
+        ]
+    )
+    return table, summary
 
 
 def save_confusion_figure(matrix_path):
     matrix_path = Path(matrix_path)
-    output_path = matrix_path.parent / 'confusion_matrix.png'
-    
+    matrix = np.load(matrix_path)
+    figure, axis = plt.subplots(figsize=(8, 8))
+    image = axis.imshow(matrix)
+    axis.set_xlabel("Predicted class")
+    axis.set_ylabel("Reference class")
+    figure.colorbar(image, ax=axis)
+    figure.tight_layout()
+    figure.savefig(
+        matrix_path.parent / "confusion_matrix.png",
+        dpi=300,
+    )
+    plt.close(figure)
+
+
+def save_metric_outputs(
+    output_dir,
+    fold_metrics,
+    class_metrics_by_fold,
+    confusion_matrices,
+):
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    fold_table, summary = summarize_fold_metrics(fold_metrics)
+    fold_table.to_csv(
+        output_dir / "fold_metrics.csv",
+        index=False,
+    )
+    summary.to_csv(
+        output_dir / "metrics_summary.csv",
+        index=False,
+    )
+
+    class_frames = []
+    for fold_index, class_metrics in enumerate(
+        class_metrics_by_fold,
+        start=1,
+    ):
+        current = class_metrics.copy()
+        current.insert(0, "fold", fold_index)
+        class_frames.append(current)
+
+    if class_frames:
+        class_table = pd.concat(
+            class_frames,
+            ignore_index=True,
+        )
+        class_table.to_csv(
+            output_dir / "class_metrics_by_fold.csv",
+            index=False,
+        )
+
+    if confusion_matrices:
+        matrices = np.asarray(confusion_matrices)
+        np.save(
+            output_dir / "confusion_matrices.npy",
+            matrices,
+        )
+        np.save(
+            output_dir / "mean_confusion_matrix.npy",
+            matrices.mean(axis=0),
+        )
+        save_confusion_figure(
+            output_dir / "mean_confusion_matrix.npy"
+        )
+
+
 def save_scores(result, output, scope, extra=None):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
+
     loss, metrics, classes, matrix, predictions, truth = result
-    record = dict(metrics, loss=loss, evaluation_scope=scope)
+    record = dict(
+        metrics,
+        loss=loss,
+        evaluation_scope=scope,
+    )
     record.update(extra or {})
-    if (output / 'metrics.csv').exists():
-        previous = pd.read_csv(output / 'metrics.csv').iloc[0]
-        
-    else:
-        pd.DataFrame([record]).to_csv(output / 'metrics.csv', index=False)
-    if not (output / 'class_metrics.csv').exists():
-        classes.to_csv(output / 'class_metrics.csv', index=False)
-    if not (output / 'confusion_matrix.npy').exists():
-        np.save(output / 'confusion_matrix.npy', matrix)
-    if not (output / 'predictions.csv').exists():
-        pd.DataFrame({'target': truth, 'prediction': predictions}).to_csv(
-            output / 'predictions.csv', index=False,
-        )
-    save_confusion_figure(output / 'confusion_matrix.npy')
+
+    pd.DataFrame([record]).to_csv(
+        output / "metrics.csv",
+        index=False,
+    )
+    classes.to_csv(
+        output / "class_metrics.csv",
+        index=False,
+    )
+    np.save(
+        output / "confusion_matrix.npy",
+        matrix,
+    )
+    pd.DataFrame(
+        {
+            "target": truth,
+            "prediction": predictions,
+        }
+    ).to_csv(
+        output / "predictions.csv",
+        index=False,
+    )
+    save_confusion_figure(
+        output / "confusion_matrix.npy"
+    )
     return record
-
-
