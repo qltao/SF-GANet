@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from config import (
+    config as base_config,
     ensure_training_parameters_confirmed,
     get_temporal_mechanism_settings,
     get_training_strategy_settings,
@@ -439,7 +440,7 @@ def main():
         ],
     )
     parser.add_argument(
-        "--seed", type=int, choices=[40, 41, 42, 43, 44]
+        "--seed", type=int, choices=base_config["training"]["repetition_seeds"]
     )
     parser.add_argument("--pretrain_run")
     parser.add_argument("--check_only", action="store_true")
