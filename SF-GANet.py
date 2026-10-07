@@ -148,7 +148,7 @@ class SF_GANet(nn.Module):
         self.supcon = supcon
 
         # 1. backbone
-        self.backbone = ResNetExtractor_Light(in_channels=in_channels, pretrained=pretrained)
+        self.backbone = MLFE(in_channels=in_channels, pretrained=pretrained)
 
         self.freq_encoder = FreqEncoder(channels=256)
 
