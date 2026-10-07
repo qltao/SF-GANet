@@ -3,11 +3,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-input_csv = Path(
-    r'F:\LCZ\outputs\analysis\map_change_reference\s1_vs_s2_s3'
-    r'\change_paired.csv'
-)
-output_csv = input_csv.with_name('change_metrics.csv')
 expected_sample_count = 800
 periods = ('previous', 'from', 'to', 'next')
 result_names = [
@@ -96,10 +91,22 @@ def calculate_metrics(samples):
     return pd.DataFrame(rows)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_csv", required=True)
+    parser.add_argument("--output_csv")
+    args = parser.parse_args()
+
+    input_csv = Path(args.input_csv)
+    output_csv = (
+        Path(args.output_csv)
+        if args.output_csv
+        else input_csv.with_name("change_metrics.csv")
+    )
     results = calculate_metrics(pd.read_csv(input_csv))
     output_csv.parent.mkdir(parents=True, exist_ok=True)
-    results.to_csv(output_csv, index=False, encoding='utf-8-sig')
-    print(f'output{output_csv}')
+    results.to_csv(output_csv, index=False)
 
 
