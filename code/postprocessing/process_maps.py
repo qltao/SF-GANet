@@ -1,5 +1,5 @@
 r"""
-文件作用：将主模型各策略的原始 10 m LCZ 地图裁剪、重采样至 100 m，并可继续执行空间与时间滤波。
+文件作用：将主模型各策略的原始 30 m LCZ 地图裁剪、重采样至 100 m，并可继续执行空间与时间滤波。
 流程位置：在主模型或 S1--S3 整图推理后运行；策略比较使用 prepare，最终产品使用 full。
 主要输入：年度原始地图目录，以及 config.py 的北京市研究区边界。
 主要输出：prepared、spatial_filtered、temporal_filtered 三个子目录下的连续年度 GeoTIFF。
@@ -125,7 +125,7 @@ def main():
     parser.add_argument(
         "--input_dir",
         required=True,
-        help="必须指定本次运行的原始10 m年度地图目录。",
+        help="必须指定本次运行的原始30 m年度地图目录。",
     )
     parser.add_argument(
         "--output_root",
