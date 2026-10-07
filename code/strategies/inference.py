@@ -1,7 +1,6 @@
 import argparse
 import json
 from pathlib import Path
-
 import numpy as np
 import rasterio
 import torch
