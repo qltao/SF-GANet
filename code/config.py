@@ -1,12 +1,3 @@
-r"""
-文件作用：主模型审稿材料配置，保留 SF-GANet、S1--S4 与顺序微调的实际参数。
-流程位置：训练、年度策略、地图预测及后处理共用配置；不单独运行。
-主要输入：年度七波段影像、SymbolID/Parcel_ID 标注和已生成的区域五折清单。
-输出：配置副本，供 train、strategies、postprocessing 调用；本模块不写结果。
-重要参数：seed 默认 42、17 类、8×8 九通道斑块、五折、预训练及年度训练预算。
-环境依赖：Python、PyTorch；输入路径仍指向原 F:\LCZ 项目。
-调用入口：train/training.py、strategies/run_strategy_comparison.py。
-"""
 
 from copy import deepcopy
 from pathlib import Path
@@ -15,18 +6,15 @@ import os
 import torch
 
 
-# 项目根目录与结果目录。所有新结果都与历史 code_pre_fine 存档分离。
 project_root = Path(r'F:\LCZ\code')
 workspace_root = project_root.parent
 output_root = workspace_root / "outputs"
 archive_root = workspace_root / "code_pre_fine"
 
-# 数据路径默认跟随项目迁移，也允许通过环境变量覆盖，避免再次写死个人电脑盘符。
 data_root = Path(os.environ.get("lcz_data_root", workspace_root / "data" / "data_pre"))
 derived_training_data_root = workspace_root / "outputs" / "preprocessing" / "final_training_data"
 training_data_root = Path(os.environ.get("lcz_training_data_root", derived_training_data_root))
 
-# LCZ 标签统一采用模型内部的 0--16 编码，导出地图时转换为 1--17 编码。
 lcz_class_names = [
     "LCZ 1",
     "LCZ 2",
@@ -109,7 +97,7 @@ config = {
     },
     'strategy_training_profiles': {
         's1': {
-            "status": "paper_main_reference", "source": "论文主模型设置及既定复用关系",
+            "status": "paper_main_reference", "source": "paper main settings and established reuse relationship",
             "training": {"learning_rate": 1e-5, "num_epochs": 100,
                          "finetune_learning_rate": 1e-6, "finetune_epochs": 5},
         },
@@ -118,7 +106,7 @@ config = {
             "training": {"learning_rate": 1e-5, "num_epochs": 100},
         },
         's3': {
-            "status": "paper_main_reference", "source": "论文主模型设置及既定复用关系",
+            "status": "paper_main_reference", "source": "paper main settings and established reuse relationship",
             "training": {"learning_rate": 1e-5, "num_epochs": 100},
         },
         's4': {
@@ -129,7 +117,6 @@ config = {
     'evaluation': {
         'split_mode': "region_five_fold",
         'n_splits': 5,
-        # 保留原断点配置字段以匹配已有预训练权重；此材料包不生成候选划分。
         'fold_candidate_seeds': list(range(20)),
         'spatial_block_size_m': 6000,
         'evaluation_scope': "five_fold_selected_validation",
@@ -184,17 +171,15 @@ config = {
 
 
 def get_experiment_config(experiment_name):
-    """返回指定实验的独立配置副本，调用方修改时不会污染全局配置。"""
     if experiment_name not in config["experiment_profiles"]:
         available_names = ", ".join(config["experiment_profiles"])
-        raise ValueError(f"未定义实验 {experiment_name}，可用实验为：{available_names}")
+        raise ValueError(f" {experiment_name}{available_names}")
 
     experiment_config = deepcopy(config)
     experiment_config["experiment"] = deepcopy(config["experiment_profiles"][experiment_name])
     experiment_config["experiment"]["name"] = experiment_name
-    # 来源说明不进入模型构造字段；实际生效值仍完整保存在training与run_config中。
     profile = deepcopy(config['experiment_training_profiles'].get(
-        experiment_name, {'status': 'current_no_legacy', 'source': '当前新增实验，暂无旧参数对应'},
+        experiment_name, {'status': 'current_no_legacy', 'source': 'current experiment; no legacy parameter source'},
     ))
     overrides = {}
     if profile.get('inherits'):
@@ -210,26 +195,24 @@ def get_experiment_config(experiment_name):
 
 
 def ensure_training_parameters_confirmed(experiment_config):
-    # 仅限制新训练/选模入口，允许只读配置和既有模型推理；不改动旧运行文件。
     provenance = experiment_config.get('parameter_provenance', {})
     if provenance.get('status') == 'pending_confirmation':
         name = experiment_config['experiment']['name']
-        raise ValueError(f"{name}的历史参数待确认：{provenance.get('reason', '')} 未启动训练。")
+        raise ValueError(f"{name}{provenance.get('reason', '')} ")
 
 
 def get_training_strategy_settings(strategy_name):
-    """返回S1--S4共享定义，避免五折训练验证和推理各自维护一份。"""
     if strategy_name not in config["training_strategies"]:
         available_names = ", ".join(config["training_strategies"])
         raise ValueError(
-            f"未定义训练策略 {strategy_name}，可用策略为：{available_names}"
+            f" {strategy_name}{available_names}"
         )
     return deepcopy(config["training_strategies"][strategy_name])
 
 
 def get_temporal_mechanism_settings(mechanism_name):
-    # 新对照使用独立配置入口，不让旧生产制图误按 S1 定义加载新机制。
     mechanisms = config["temporal_training_mechanisms"]
     if mechanism_name not in mechanisms:
-        raise ValueError(f"未定义时间训练机制：{mechanism_name}")
+        raise ValueError(f"{mechanism_name}")
     return deepcopy(mechanisms[mechanism_name])
+
