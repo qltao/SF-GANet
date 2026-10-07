@@ -170,7 +170,7 @@ class SF_GANet(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(feature_dim, feature_dim // 2),
             nn.ReLU(),
-            nn.Dropout(0.5),  # 加入Dropout
+            nn.Dropout(0.5),
             nn.Linear(feature_dim // 2, num_classes)
         )
 
@@ -203,3 +203,4 @@ class SF_GANet(nn.Module):
             return features, logits
         else:
             return logits
+
