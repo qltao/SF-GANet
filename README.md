@@ -44,3 +44,4 @@ README.md
 - The complete annual map series used for map-based temporal analysis is generated with the fixed default seed 42.
 - The supervised contrastive loss uses temperature = 0.1 and base_temperature = 0.1.
 
+
