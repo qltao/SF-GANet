@@ -22,17 +22,13 @@ from postprocessing.process_maps import (
 
 strategy_paths = {
     "s1": Path(
-        r"F:\LCZ\outputs\training_strategy_s1\region_five_fold"
-        r"\training_strategy_s1_seed42\strategy_best\bd7ee18470de7fe2"
-        r"\maps\temporal_majority3\20261004_132923_920944"
+        r"F:\LCZ\outputs\training_strategy_s1\maps"
     ),
     "s2": Path(
-        r"F:\LCZ\outputs\training_strategy_s2\region_five_fold"
-        r"\training_strategy_s2_seed42\strategy_best\dea83248d69ccdc0\maps\prepared"
+        r"F:\LCZ\outputs\training_strategy_s2\maps"
     ),
     "s3": Path(
-        r"F:\LCZ\outputs\training_strategy_s3\region_five_fold"
-        r"\training_strategy_s3_seed42\strategy_best\812b033d1efd89fe\maps\prepared"
+        r"F:\LCZ\outputs\training_strategy_s3\maps"
     ),
 }
 output_root = Path(r"F:\LCZ\outputs\analysis\spatiotemporal_filter")
