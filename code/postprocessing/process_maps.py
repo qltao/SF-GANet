@@ -160,7 +160,7 @@ def prepare_raw_100m(
     raw_100m_root = output_root / "raw_100m"
     raw_100m_root.mkdir(parents=True, exist_ok=True)
 
-    prepared = {}
+    raw_maps = {}
     for year in experiment_config["data"]["years"]:
         input_path = find_year_map(input_dir, year)
         output_path = (
@@ -176,11 +176,11 @@ def prepare_raw_100m(
             ],
         )
         with rasterio.open(output_path) as source:
-            prepared[year] = (
+            raw_maps[year] = (
                 source.read(1),
                 source.profile.copy(),
             )
-    return raw_100m_root, prepared
+    return raw_100m_root, raw_maps
 
 
 def apply_full_postprocessing(
