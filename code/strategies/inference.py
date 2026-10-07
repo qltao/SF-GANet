@@ -224,7 +224,7 @@ def run_strategy_inference(strategy_name, years, selection_dir, check_only=False
               f'percentiles={percentiles}', flush=True)
         if check_only:
             continue
-        output = output_root / 'maps' / 'raw' / f'LCZ_Map_{strategy_name}_{year}_raw_10m.tif'
+        output = output_root / 'maps' / 'raw' / f'LCZ_Map_{strategy_name}_{year}_raw_30m.tif'
         metadata = {
             'run_dir': str(source), 'checkpoint': str(checkpoint),
             'percentiles': str(percentiles), 'year': year,
