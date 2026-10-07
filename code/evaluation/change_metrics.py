@@ -24,12 +24,22 @@ def macro_f1(reference, prediction):
 
 
 def calculate_metrics(samples):
+    if len(samples) != expected_sample_count:
+        raise ValueError(
+            f"Expected {expected_sample_count} paired reference samples."
+        )
+    if samples["sample_id"].isna().any() or samples["sample_id"].duplicated().any():
+        raise ValueError("Reference sample IDs must be complete and unique.")
     samples = samples.set_index('sample_id').sort_index()
     year_columns = [f'{p}_year' for p in periods]
     reference_columns = [f'reference_{p}_lcz' for p in periods]
     prediction_columns = [f'{name}_{p}_lcz' for name in result_names for p in periods]
     values = samples[reference_columns + prediction_columns].to_numpy(dtype=float)
     valid = np.isfinite(values) & (values >= 1) & (values <= 17) & (values == np.floor(values))
+    if not valid.all():
+        raise ValueError("Reference or prediction values are missing or outside LCZ classes 1-17.")
+    if not np.all(np.diff(samples[year_columns], axis=1) == 1):
+        raise ValueError("Reference years must be consecutive.")
     reference = samples[['reference_from_lcz', 'reference_to_lcz']].to_numpy(dtype=int)
     rows = []
     for result_name in result_names:
