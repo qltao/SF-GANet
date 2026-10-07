@@ -80,6 +80,7 @@ config = {
         "patience": 10,
         "num_workers": 0,
         "seed": 42,
+        "repetition_seeds": [40, 41, 42, 43, 44],
         "device": "cuda" if torch.cuda.is_available() else "cpu",
         "supcon_lambda": 0.10,
         "supcon_temperature": 0.1,
