@@ -4,7 +4,7 @@
 code/
 ├── config.py
 ├── model/
-│   └── SF-GANet.py                  
+│   └── model.py                  
 ├── train/
 │   ├── training.py               
 │   ├── data_handler.py           
