@@ -100,4 +100,5 @@ if __name__ == '__main__':
     results = calculate_metrics(pd.read_csv(input_csv))
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     results.to_csv(output_csv, index=False, encoding='utf-8-sig')
-    print(f'output：{output_csv}')
+    print(f'output{output_csv}')
+
