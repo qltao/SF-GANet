@@ -204,3 +204,4 @@ class SF_GANet(nn.Module):
         else:
             return logits
 
+
