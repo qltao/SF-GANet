@@ -2,7 +2,7 @@ r"""
 文件作用：主模型的九通道斑块提取、训练侧归一化、数据增强和区域五折数据加载。
 输入：七波段 GeoTIFF、SymbolID/Parcel_ID 标注，以及 role/year/fold 等固定清单字段。
 输出：features/y/year/fold/role 数组、训练/验证 DataLoader 与训练分位数。
-重要参数：8×8 窗口、NDVI/NDBI、类别编码 0--16；验证使用训练侧分位数。
+重要参数：所有年份均使用8×8窗口和50%重叠，NDVI/NDBI、类别编码0--16；验证使用训练侧分位数。
 环境依赖：GeoPandas、Rasterio、Shapely、PyTorch、Torchvision、NumPy、Pandas、tqdm。
 调用入口：train/training.py；年度策略调用训练模块，地图预测调用指数计算函数；不单独运行。
 """
@@ -77,7 +77,7 @@ def calculate_percentiles_from_patches(features, data_config):
 
 
 def extract_patches(source, labels, data_config, group_id_column=None):
-    """在已划分的地块内提取斑块，保证同一地块的重叠窗口不会跨训练与测试集合。"""
+    """所有年份均以50%重叠的滑动窗口在已划分地块内提取斑块，保证重叠窗口不跨折。"""
     group_id_column = group_id_column or data_config["group_id_column"]
     label_column = data_config["label_column"]
     required_columns = [label_column, group_id_column]
@@ -288,7 +288,7 @@ def extract_region_year(records, cfg, year):
     # 真实训练提取函数统一调用；在分组之后提取，核对逐组计数。
     parts, targets, roles, folds, years = [], [], [], [], []
     labels = gpd.read_file(cfg['paths']['label_root'] / f'final_labels_{year}.shp')
-    image_path = cfg['paths']['image_root'] / f'Beijing_{year}_Summer_10m.tif'
+    image_path = cfg['paths']['image_root'] / f'Beijing_{year}_Summer_30m.tif'
     with rasterio.open(image_path) as source:
         if labels.crs != source.crs or source.count != 7:
             raise ValueError(f'{year}影像波段或标注坐标系不符合已审核输入。')
@@ -317,7 +317,7 @@ def extract_region_year(records, cfg, year):
 
 def region_cache_key(records, cfg, year):
     # 大影像使用绝对路径、字节数、纳秒修改时间；小标注文件同时校验内容哈希。
-    image = cfg['paths']['image_root'] / f'Beijing_{year}_Summer_10m.tif'
+    image = cfg['paths']['image_root'] / f'Beijing_{year}_Summer_30m.tif'
     label = cfg['paths']['label_root'] / f'final_labels_{year}.shp'
     files = [image]
     files.extend(Path(str(image) + suffix) for suffix in ['.aux.xml', '.msk']
