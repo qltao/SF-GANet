@@ -144,4 +144,5 @@ if __name__ == '__main__':
     ]:
         output_csv = output_dir / filename
         table.to_csv(output_csv, index=False, encoding='utf-8-sig')
-        print(f'output：{output_csv}')
+        print(f'output{output_csv}')
+
