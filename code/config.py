@@ -120,7 +120,6 @@ config = {
         'fold_candidate_seeds': list(range(20)),
         'spatial_block_size_m': 6000,
         'evaluation_scope': "five_fold_selected_validation",
-        'manifest_sha256': "41a125bc3183bf54da128c0705c0538299353b876f8fbd46be84e3b8e1486eb2",
         'selection_metric': "macro_f1",
         'selection_tie_break': "oa",
     },
