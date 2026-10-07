@@ -102,3 +102,4 @@ if __name__ == '__main__':
     results.to_csv(output_csv, index=False, encoding='utf-8-sig')
     print(f'output{output_csv}')
 
+
