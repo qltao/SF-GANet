@@ -5,7 +5,6 @@ from torchvision.models import resnet50, ResNet50_Weights
 import warnings
 from einops import rearrange
 
-
 class MLFE(nn.Module):
     def __init__(self, in_channels=9, pretrained=True):
         super().__init__()
