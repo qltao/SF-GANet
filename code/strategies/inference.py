@@ -111,7 +111,7 @@ def inspect_map_output(output_path, expected_metadata):
     for key in ['year', 'scope', 'selected_fold']:
         if key in expected_metadata and saved_metadata.get(key) != expected_metadata[key]:
             raise FileExistsError(
-                f'地图来源字段{key}不一致，拒绝覆盖：{output_path}'
+                f'{key}{output_path}'
             )
     try:
         with rasterio.open(output_path) as source:
@@ -197,7 +197,7 @@ def run_checkpoint_inference(
                         destination.write(predictions, indexes=1, window=window)
                         progress_bar.update(1)
     partial_output_path.replace(output_path)
-    print(f" {year} output to：{output_path}")
+    print(f" {year} output to{output_path}")
     return output_path
 
 
@@ -213,7 +213,7 @@ def run_strategy_inference(strategy_name, years, selection_dir, check_only=False
     year_progress = tqdm(
         years,
         desc=f'{strategy_name.upper()}',
-        unit='年',
+        unit='',
         dynamic_ncols=True,
     )
     for year in year_progress:
@@ -233,22 +233,21 @@ def run_strategy_inference(strategy_name, years, selection_dir, check_only=False
         }
         output_status = inspect_map_output(output, metadata)
         if output_status == 'complete':
-            print(f'年份 {year} 已完整完成，跳过：{output}', flush=True)
+            print(f' {year} {output}', flush=True)
             continue
         if output_status == 'incomplete':
-            print(f'年份 {year} 存在中断产物，从该年开头重新推理。', flush=True)
+            print(f' {year} ', flush=True)
         run_checkpoint_inference(
             year, 'sf_ganet', checkpoint, percentiles, output, experiment_config,
         )
-        # 单独保存本幅地图来源，不修改已完成运行的训练配置。
         write_map_metadata(output, metadata)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='使用已选年度权重进行策略地图预测')
+    parser = argparse.ArgumentParser(description='')
     parser.add_argument('--strategy', required=True, choices=map_strategies)
     parser.add_argument('--selection_dir', required=True,
-                        help='原实验 strategy_best/<选择哈希> 目录，内有 selection.json')
+                        help=' strategy_best/<>  selection.json')
     parser.add_argument('--year', type=int)
     parser.add_argument('--check_only', action='store_true')
     arguments = parser.parse_args()
@@ -256,7 +255,7 @@ def main():
     configured_years = experiment_config['data']['years']
     years = [arguments.year] if arguments.year is not None else configured_years
     if any(year not in configured_years for year in years):
-        raise ValueError('年份不在配置范围内。')
+        raise ValueError('')
     run_strategy_inference(
         arguments.strategy, years, arguments.selection_dir, arguments.check_only,
     )
@@ -264,3 +263,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
