@@ -73,7 +73,7 @@ config = {
     },
     'data': {
         'years': list(range(2001, 2021)),
-        'image_filename_format': "Beijing_{year}_Summer_10m.tif",
+        'image_filename_format': "Beijing_{year}_Summer_30m.tif",
         'label_filename_format': "final_labels_{year}.shp",
         'raw_label_filename_format': "reprojected_vector_{year}.shp",
         'label_column': "SymbolID",
@@ -115,7 +115,7 @@ config = {
         },
         's2': {
             "status": "verified_legacy", "source": "code_pre_fine/exp_liucheng/3_run_strategy2_from_scratch.py",
-            "training": {"learning_rate": 5e-6, "num_epochs": 100},
+            "training": {"learning_rate": 1e-5, "num_epochs": 100},
         },
         's3': {
             "status": "paper_main_reference", "source": "论文主模型设置及既定复用关系",
@@ -123,7 +123,7 @@ config = {
         },
         's4': {
             "status": "verified_legacy", "source": "code_pre_fine/exp_liucheng/5_run_strategy4_imagenet.py",
-            "training": {"learning_rate": 5e-6, "num_epochs": 100},
+            "training": {"learning_rate": 1e-5, "num_epochs": 100},
         },
     },
     'evaluation': {
