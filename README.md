@@ -1,6 +1,26 @@
 
 ## The Code
 
+code/
+├── config.py
+├── model/
+│   └── SF-GANet.py                  
+├── train/
+│   ├── training.py               
+│   ├── data_handler.py           
+│   └── losses.py                 
+├── strategies/
+│   ├── run_strategy_comparison.py 
+│   └── inference.py              
+├── evaluation/
+│   ├── metrics.py                
+│   ├── change_metrics.py         
+│   └── temporal_metrics.py       
+└── postprocessing/
+    ├── process_maps.py           
+    └── spatiotemporal_filter.py   
+README.md
+
 ### Requirements
 
 - python==3.10.0
